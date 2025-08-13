@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "SkillSpark",
+    "slug": "SkillSpark",
+    "scheme": "SkillSpark",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "softwareKeyboardLayoutMode": "pan"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.tharuncodes.SkillSpark",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "*.youtube.com"
+            },
+            {
+              "scheme": "https",
+              "host": "youtube.com"
+            },
+            {
+              "scheme": "https",
+              "host": "m.youtube.com"
+            },
+            {
+              "scheme": "vnd.youtube"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "softwareKeyboardLayoutMode": "pan"
+  },
+  "web": {
+    "favicon": "./assets/favicon.png"
+  },
+  "plugins": ["expo-router"],
+  "extra": {
+    "router": {},
+    "eas": {
+      "projectId": "8cd6d18c-447b-402d-b6c7-0a70596fea7a"
+    }
+  }
+}
