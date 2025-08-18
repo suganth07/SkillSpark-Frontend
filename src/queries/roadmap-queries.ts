@@ -43,6 +43,7 @@ export interface Roadmap {
 }
 
 const BASE = process.env.EXPO_PUBLIC_BACKEND_URL!;
+console.log("🔗 Backend URL:", BASE);
 
 async function getUserPreferencesWithDefaults(): Promise<UserPreferences> {
   try {
@@ -472,21 +473,45 @@ export async function arePlaylistsLoadedForPoint(
 
 export async function generatePlaylistsFromBackend(
   topic: string,
-  pointTitle: string
+  pointTitle: string,
+  roadmapId?: string,
+  level?: string
 ): Promise<PlaylistItem[]> {
   try {
     const preferences = await getUserPreferencesWithDefaults();
+    const currentUser = await authService.getCurrentUser();
+
+    // If roadmapId and level are provided, first check if videos exist in Supabase
+    if (roadmapId && level && currentUser) {
+      try {
+        const existingVideosResponse = await loadVideosFromSupabase(roadmapId, level);
+        if (existingVideosResponse && existingVideosResponse.videos.length > 0) {
+          console.log(`✅ Found existing videos in Supabase for ${topic} (${level}):`, existingVideosResponse.videos.length);
+          return existingVideosResponse.videos;
+        }
+      } catch (error) {
+        console.log(`📹 No existing videos found in Supabase, generating new ones...`);
+      }
+    }
+
+    const requestBody: any = {
+      topic,
+      pointTitle,
+      userPreferences: preferences,
+    };
+
+    // Add video storage parameters if available
+    if (roadmapId && level && currentUser) {
+      requestBody.userRoadmapId = roadmapId;
+      requestBody.level = level;
+    }
 
     const response = await fetch(`${BASE}/api/playlists/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        topic,
-        pointTitle,
-        userPreferences: preferences,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -506,11 +531,106 @@ export async function generatePlaylistsFromBackend(
   }
 }
 
+// Add new function to load videos from Supabase with pagination support
+export async function loadVideosFromSupabase(roadmapId: string, level: string, page: number = 1): Promise<{videos: PlaylistItem[], hasMore: boolean}> {
+  try {
+    const currentUser = await authService.getCurrentUser();
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log(`📹 Loading videos from Supabase for roadmap: ${roadmapId}, level: ${level}, page: ${page}`);
+    
+    const response = await fetch(`${BASE}/api/users/videos/${roadmapId}?level=${level}&userId=${currentUser.id}&page=${page}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load videos: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || "Failed to load videos");
+    }
+    
+    console.log(`✅ Loaded videos from Supabase:`, result.data?.videos?.length || 0, 'videos, hasMore:', result.data?.hasMore);
+    
+    return {
+      videos: result.data?.videos || [],
+      hasMore: result.data?.hasMore || false
+    };
+  } catch (error) {
+    console.error('❌ Error loading videos from Supabase:', error);
+    throw error;
+  }
+}
+
+// Add new function to regenerate videos
+export async function regenerateVideos(roadmapId: string, level: string, topic: string, pointTitle: string): Promise<PlaylistItem[]> {
+  try {
+    console.log("🔄 regenerateVideos called with:", { roadmapId, level, topic, pointTitle });
+    
+    const currentUser = await authService.getCurrentUser();
+    if (!currentUser) {
+      console.log("❌ User not authenticated");
+      throw new Error('User not authenticated');
+    }
+    console.log("✅ User authenticated:", currentUser.id);
+
+    const preferences = await getUserPreferencesWithDefaults();
+    console.log("✅ Got user preferences:", preferences);
+
+    console.log(`🔄 Regenerating videos for roadmap: ${roadmapId}, level: ${level}`);
+    
+    const requestBody = {
+      topic,
+      pointTitle,
+      userPreferences: preferences,
+      userRoadmapId: roadmapId,
+      level: level
+    };
+    console.log("📤 Request body:", requestBody);
+    
+    const response = await fetch(`${BASE}/api/playlists/regenerate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log("📥 Response status:", response.status, response.statusText);
+
+    if (!response.ok) {
+      throw new Error(`Failed to regenerate videos: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || "Failed to regenerate videos");
+    }
+
+    console.log(`✅ Regenerated videos for ${topic} (${level}):`, result.data?.length || 0, 'videos');
+    
+    return result.data || [];
+  } catch (error) {
+    console.error('❌ Error regenerating videos:', error);
+    throw error;
+  }
+}
+
 export async function loadPlaylistsForPoint(
   roadmapId: string,
   pointId: string,
   topic: string,
-  pointTitle: string
+  pointTitle: string,
+  level?: string
 ): Promise<PlaylistItem[]> {
   try {
     const areLoaded = await arePlaylistsLoadedForPoint(roadmapId, pointId);
@@ -518,7 +638,7 @@ export async function loadPlaylistsForPoint(
       return await getPlaylistsForPoint(roadmapId, pointId);
     }
 
-    const playlists = await generatePlaylistsFromBackend(topic, pointTitle);
+    const playlists = await generatePlaylistsFromBackend(topic, pointTitle, roadmapId, level);
 
     await initializePlaylistsForPoint(roadmapId, pointId, playlists);
 
@@ -533,10 +653,11 @@ export async function regeneratePlaylistsForPoint(
   roadmapId: string,
   pointId: string,
   topic: string,
-  pointTitle: string
+  pointTitle: string,
+  level?: string
 ): Promise<PlaylistItem[]> {
   try {
-    const playlists = await generatePlaylistsFromBackend(topic, pointTitle);
+    const playlists = await regenerateVideos(roadmapId, level || 'beginner', topic, pointTitle);
 
     await initializePlaylistsForPoint(roadmapId, pointId, playlists);
 
@@ -601,6 +722,28 @@ export async function getRoadmapsByLevel(
   } catch (error) {
     console.error("Error fetching roadmap points by level:", error);
     return [];
+  }
+}
+
+// New function to fetch videos with pagination support
+export async function fetchVideosWithPagination(
+  roadmapId: string, 
+  level: string, 
+  page: number = 1
+): Promise<{videos: PlaylistItem[], hasMore: boolean}> {
+  try {
+    const currentUser = await authService.getCurrentUser();
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log(`📹 Fetching videos with pagination for roadmap: ${roadmapId}, level: ${level}, page: ${page}`);
+    
+    const response = await loadVideosFromSupabase(roadmapId, level, page);
+    return response;
+  } catch (error) {
+    console.error('❌ Error fetching videos with pagination:', error);
+    throw error;
   }
 }
 

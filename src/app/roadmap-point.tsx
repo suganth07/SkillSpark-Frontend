@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Card, CardContent } from "~/components/ui/card";
+import { ConfirmationModal } from "~/components/ui/confirmation-modal";
 import Icon from "~/lib/icons/Icon";
 import { YouTubeIcon } from "~/lib/icons/YouTube";
 import { Spinner } from "~/components/ui/spinner";
@@ -21,6 +22,7 @@ import {
   loadPlaylistsForPoint,
   regeneratePlaylistsForPoint,
   arePlaylistsLoadedForPoint,
+  fetchVideosWithPagination,
   RoadmapPoint,
   PlaylistItem,
 } from "~/queries/roadmap-queries";
@@ -53,6 +55,10 @@ export default function RoadmapPointScreen() {
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
   const [regeneratingPlaylists, setRegeneratingPlaylists] = useState(false);
   const [roadmapTopic, setRoadmapTopic] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMorePages, setHasMorePages] = useState(false);
+  const [loadingMorePages, setLoadingMorePages] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const pulseScale = useSharedValue(1);
 
   useEffect(() => {
@@ -143,18 +149,38 @@ export default function RoadmapPointScreen() {
 
     try {
       setLoadingPlaylists(true);
+      
+      // Try to fetch videos from Supabase with pagination
+      try {
+        const videosResponse = await fetchVideosWithPagination(roadmapId, pointData.level, 1);
+        if (videosResponse.videos.length > 0) {
+          setPlaylists(videosResponse.videos);
+          setCurrentPage(1);
+          setHasMorePages(videosResponse.hasMore);
+          return;
+        }
+      } catch (error) {
+        console.log("No videos found in Supabase, checking local storage...");
+      }
+
+      // Fallback to checking local storage and generating if needed
       const areLoaded = await arePlaylistsLoadedForPoint(roadmapId, pointId);
 
       if (areLoaded && pointData.playlists) {
         setPlaylists(pointData.playlists);
+        setCurrentPage(1);
+        setHasMorePages(false);
       } else {
         const loadedPlaylists = await loadPlaylistsForPoint(
           roadmapId,
           pointId,
           topic,
-          pointData.title
+          pointData.title,
+          pointData.level
         );
         setPlaylists(loadedPlaylists);
+        setCurrentPage(1);
+        setHasMorePages(false);
       }
     } catch (error) {
       console.error("Error loading playlists:", error);
@@ -164,50 +190,139 @@ export default function RoadmapPointScreen() {
     }
   };
 
-  const handleRegeneratePlaylists = async () => {
-    if (!point || !roadmapId || !pointId) return;
+  const goToNextPage = async () => {
+    if (!hasMorePages || loadingMorePages || !roadmapId || !point) return;
 
-    Alert.alert(
-      "Regenerate Videos",
-      "This will generate new learning videos for this topic. Continue?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Regenerate",
-          style: "default",
-          onPress: async () => {
-            try {
-              setRegeneratingPlaylists(true);
-              const newPlaylists = await regeneratePlaylistsForPoint(
-                roadmapId,
-                pointId,
-                roadmapTopic,
-                point.title
-              );
-              setPlaylists(newPlaylists);
-              headerScale.value = withSpring(
-                1.05,
-                { damping: 15, stiffness: 200 },
-                () => {
-                  headerScale.value = withSpring(1, {
-                    damping: 15,
-                    stiffness: 200,
-                  });
-                }
-              );
-            } catch (error) {
-              console.error("Error regenerating playlists:", error);
-              Alert.alert(
-                "Error",
-                "Failed to regenerate videos. Please try again."
-              );
-            } finally {
-              setRegeneratingPlaylists(false);
-            }
-          },
-        },
-      ]
-    );
+    try {
+      setLoadingMorePages(true);
+      const nextPage = currentPage + 1;
+      const videosResponse = await fetchVideosWithPagination(roadmapId, point.level, nextPage);
+      
+      setPlaylists(videosResponse.videos); // Replace videos instead of appending
+      setCurrentPage(nextPage);
+      setHasMorePages(videosResponse.hasMore);
+    } catch (error) {
+      console.error("Error loading next page:", error);
+      Alert.alert("Error", "Failed to load next page");
+    } finally {
+      setLoadingMorePages(false);
+    }
+  };
+
+  const goToPreviousPage = async () => {
+    if (currentPage <= 1 || loadingMorePages || !roadmapId || !point) return;
+
+    try {
+      setLoadingMorePages(true);
+      const previousPage = currentPage - 1;
+      const videosResponse = await fetchVideosWithPagination(roadmapId, point.level, previousPage);
+      
+      setPlaylists(videosResponse.videos); // Replace videos instead of appending
+      setCurrentPage(previousPage);
+      
+      // Check if there are more pages after the previous page (which would be the current page)
+      try {
+        const checkNextPage = await fetchVideosWithPagination(roadmapId, point.level, previousPage + 1);
+        setHasMorePages(checkNextPage.videos.length > 0 || checkNextPage.hasMore);
+      } catch (error) {
+        // If we can't check the next page, assume there are more pages
+        setHasMorePages(true);
+      }
+    } catch (error) {
+      console.error("Error loading previous page:", error);
+      Alert.alert("Error", "Failed to load previous page");
+    } finally {
+      setLoadingMorePages(false);
+    }
+  };
+
+  const executeRegeneration = async () => {
+    if (!point || !roadmapId || !pointId) {
+      console.log("❌ Missing required values for regeneration");
+      return;
+    }
+
+    console.log("✅ Starting regeneration process...");
+    try {
+      setRegeneratingPlaylists(true);
+      console.log("📞 Calling regeneratePlaylistsForPoint with:", {
+        roadmapId,
+        pointId,
+        roadmapTopic,
+        pointTitle: point.title,
+        level: point.level
+      });
+      
+      const newPlaylists = await regeneratePlaylistsForPoint(
+        roadmapId,
+        pointId,
+        roadmapTopic,
+        point.title,
+        point.level
+      );
+      
+      console.log("✅ Regeneration completed, got playlists:", newPlaylists.length);
+      
+      // After regeneration, reload the first page to get the new videos
+      try {
+        console.log("📄 Fetching first page of videos...");
+        const videosResponse = await fetchVideosWithPagination(roadmapId, point.level, 1);
+        setPlaylists(videosResponse.videos);
+        setCurrentPage(1);
+        setHasMorePages(videosResponse.hasMore);
+        console.log("✅ Successfully loaded new videos:", videosResponse.videos.length);
+      } catch (error) {
+        console.log("⚠️ Pagination fetch failed, using fallback:", error);
+        // Fallback to the regenerated playlists if pagination fetch fails
+        setPlaylists(newPlaylists);
+        setCurrentPage(1);
+        setHasMorePages(false);
+      }
+      
+      headerScale.value = withSpring(
+        1.05,
+        { damping: 15, stiffness: 200 },
+        () => {
+          headerScale.value = withSpring(1, {
+            damping: 15,
+            stiffness: 200,
+          });
+        }
+      );
+    } catch (error) {
+      console.error("❌ Error regenerating playlists:", error);
+      if (Platform.OS === 'web') {
+        window.alert("Failed to regenerate videos. Please try again.");
+      } else {
+        Alert.alert("Error", "Failed to regenerate videos. Please try again.");
+      }
+    } finally {
+      console.log("🏁 Regeneration process completed");
+      setRegeneratingPlaylists(false);
+    }
+  };
+
+  const handleRegeneratePlaylists = async () => {
+    console.log("🔄 Regenerate button clicked!");
+    console.log("📋 Current values:", { point: !!point, roadmapId, pointId, roadmapTopic });
+    
+    if (!point || !roadmapId || !pointId) {
+      console.log("❌ Missing required values:", { point: !!point, roadmapId, pointId });
+      return;
+    }
+
+    console.log("✅ All values present, showing confirmation modal...");
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmRegeneration = async () => {
+    setShowConfirmModal(false);
+    await executeRegeneration();
+  };
+
+  const handleCancelRegeneration = () => {
+    console.log("❌ User cancelled regeneration");
+    setShowConfirmModal(false);
   };
 
   const handleToggleCompletion = async () => {
@@ -454,6 +569,80 @@ export default function RoadmapPointScreen() {
                       <PlaylistCard playlist={playlist} index={index} />
                     </View>
                   ))}
+                  
+                  {/* Pagination Controls */}
+                  {(hasMorePages || currentPage > 1) && (
+                    <View className="mt-6 mb-4">
+                      <View className="flex-row justify-between items-center space-x-3">
+                        {/* Previous Page Button */}
+                        <TouchableOpacity
+                          onPress={goToPreviousPage}
+                          disabled={currentPage <= 1 || loadingMorePages}
+                          className={`flex-1 flex-row items-center justify-center px-4 py-3 rounded-lg ${
+                            currentPage <= 1 
+                              ? 'bg-muted opacity-50' 
+                              : 'bg-secondary'
+                          }`}
+                        >
+                          {loadingMorePages ? (
+                            <Spinner size={16} />
+                          ) : (
+                            <>
+                              <Icon 
+                                name="ChevronLeft" 
+                                size={16} 
+                                color={currentPage <= 1 ? "#9ca3af" : "#6b7280"} 
+                              />
+                              <Text className={`font-medium text-sm ml-2 ${
+                                currentPage <= 1 
+                                  ? 'text-muted-foreground' 
+                                  : 'text-secondary-foreground'
+                              }`}>
+                                Previous
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+
+                        {/* Page Indicator */}
+                        <View className="px-4">
+                          <Text className="text-center text-sm font-medium text-foreground">
+                            Page {currentPage}
+                          </Text>
+                        </View>
+
+                        {/* Next Page Button */}
+                        <TouchableOpacity
+                          onPress={goToNextPage}
+                          disabled={!hasMorePages || loadingMorePages}
+                          className={`flex-1 flex-row items-center justify-center px-4 py-3 rounded-lg ${
+                            !hasMorePages 
+                              ? 'bg-muted opacity-50' 
+                              : 'bg-secondary'
+                          }`}
+                        >
+                          {loadingMorePages ? (
+                            <Spinner size={16} />
+                          ) : (
+                            <>
+                              <Text className={`font-medium text-sm mr-2 ${
+                                !hasMorePages 
+                                  ? 'text-muted-foreground' 
+                                  : 'text-secondary-foreground'
+                              }`}>
+                                Next
+                              </Text>
+                              <Icon 
+                                name="ChevronRight" 
+                                size={16} 
+                                color={!hasMorePages ? "#9ca3af" : "#6b7280"} 
+                              />
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
                 </View>
               ) : (
                 <Card>
@@ -483,6 +672,18 @@ export default function RoadmapPointScreen() {
           </ScrollView>
         </Animated.View>
       </SafeAreaView>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        visible={showConfirmModal}
+        title="Regenerate Videos"
+        message="This will generate new learning videos for this topic. Your current videos will be moved to previous pages. Continue?"
+        confirmText="Regenerate"
+        cancelText="Cancel"
+        onConfirm={handleConfirmRegeneration}
+        onCancel={handleCancelRegeneration}
+        isLoading={regeneratingPlaylists}
+      />
     </View>
   );
 }
