@@ -204,15 +204,40 @@ export async function getRoadmapById(id: string): Promise<Roadmap | null> {
 
 export async function deleteRoadmap(id: string): Promise<void> {
   try {
-    // Note: Backend API for delete roadmap not implemented yet
-    // For now, we'll just remove from local active roadmap if it matches
+    const currentUser = await authService.getCurrentUser();
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log(`🗑️ Deleting roadmap: ${id}`);
+    
+    const response = await fetch(`${BASE}/api/users/roadmaps/${id}?userId=${currentUser.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log("📥 Delete response status:", response.status, response.statusText);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || `Failed to delete roadmap: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || "Failed to delete roadmap");
+    }
+
+    // Remove from local active roadmap if it matches
     const activeRoadmap = await getActiveRoadmap();
     if (activeRoadmap?.id === id) {
       await clearActiveRoadmap();
     }
     
-    // TODO: Implement backend DELETE endpoint for roadmaps
-    console.warn("Delete roadmap API not implemented yet");
+    console.log(`✅ Successfully deleted roadmap: ${id}`);
   } catch (error) {
     console.error("Error deleting roadmap:", error);
     throw error;

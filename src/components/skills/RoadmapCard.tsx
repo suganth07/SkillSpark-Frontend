@@ -1,6 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, Pressable } from "react-native";
 import { Card } from "~/components/ui/card";
+import { ConfirmationModal } from "~/components/ui/confirmation-modal";
 import Icon from "~/lib/icons/Icon";
 import { Roadmap } from "~/queries/roadmap-queries";
 import Animated, {
@@ -15,18 +16,22 @@ import Animated, {
 interface RoadmapCardProps {
   roadmap: Roadmap;
   onPress: () => void;
+  onDelete?: (roadmapId: string) => void;
   delay?: number;
 }
 
 export default function RoadmapCard({
   roadmap,
   onPress,
+  onDelete,
   delay = 0,
 }: RoadmapCardProps) {
   const scale = useSharedValue(0.8);
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(30);
   const pressScale = useSharedValue(1);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -119,6 +124,23 @@ export default function RoadmapCard({
   const progressPercentage =
     totalPoints > 0 ? Math.round((completedPoints / totalPoints) * 100) : 0;
 
+  const handleDeletePress = (e: any) => {
+    e.stopPropagation(); // Prevent triggering the card press
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = () => {
+    setShowDeleteModal(false);
+    if (onDelete) {
+      setIsDeleting(true);
+      onDelete(roadmap.id);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteModal(false);
+  };
+
   return (
     <Animated.View style={cardStyle}>
       <Pressable
@@ -162,6 +184,17 @@ export default function RoadmapCard({
 
               <View className="items-end">
                 <View className="flex-row items-center mb-1">
+                  <TouchableOpacity
+                    onPress={handleDeletePress}
+                    disabled={isDeleting}
+                    className="p-2 mr-2 rounded-full bg-red-500/10"
+                  >
+                    <Icon 
+                      name={isDeleting ? "Loader" : "Trash2"} 
+                      size={14} 
+                      color="#ef4444" 
+                    />
+                  </TouchableOpacity>
                   <Icon name="Target" size={14} color="#6b7280" />
                   <Text className="text-xs text-muted-foreground ml-1">
                     {totalPoints} topics
@@ -193,6 +226,18 @@ export default function RoadmapCard({
           </View>
         </Card>
       </Pressable>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        visible={showDeleteModal}
+        title="Delete Roadmap"
+        message={`Are you sure you want to delete "${roadmap.topic}"? This action cannot be undone and will remove all your progress.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        isLoading={isDeleting}
+      />
     </Animated.View>
   );
 }

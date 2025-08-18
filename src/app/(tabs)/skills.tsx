@@ -3,7 +3,7 @@ import { View, Text, FlatList, RefreshControl, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { getAllRoadmaps, Roadmap } from "~/queries/roadmap-queries";
+import { getAllRoadmaps, deleteRoadmap, Roadmap } from "~/queries/roadmap-queries";
 import RoadmapCard from "~/components/skills/RoadmapCard";
 import SearchBar from "~/components/skills/SearchBar";
 import { Button } from "~/components/ui/button";
@@ -131,6 +131,21 @@ export default function SkillsScreen() {
     });
   };
 
+  const handleDeleteRoadmap = async (roadmapId: string) => {
+    try {
+      await deleteRoadmap(roadmapId);
+      
+      // Remove from local state
+      setRoadmaps(prevRoadmaps => prevRoadmaps.filter(r => r.id !== roadmapId));
+      setFilteredRoadmaps(prevFiltered => prevFiltered.filter(r => r.id !== roadmapId));
+      
+      Alert.alert("Success", "Roadmap deleted successfully");
+    } catch (error) {
+      console.error("Error deleting roadmap:", error);
+      Alert.alert("Error", "Failed to delete roadmap. Please try again.");
+    }
+  };
+
   const headerStyle = useAnimatedStyle(() => ({
     opacity: headerOpacity.value,
     transform: [{ translateY: headerTranslateY.value }],
@@ -146,6 +161,7 @@ export default function SkillsScreen() {
     <RoadmapCard
       roadmap={item}
       onPress={() => handleRoadmapPress(item)}
+      onDelete={handleDeleteRoadmap}
       delay={index * 100}
     />
   );
