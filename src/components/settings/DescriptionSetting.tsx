@@ -3,7 +3,7 @@ import { View, Text, Pressable } from "react-native";
 import {
   fetchUserDescription,
   setUserDescription,
-} from "~/queries/user-queries";
+} from "~/queries/user-queries-new";
 import { Input } from "~/components/ui/input";
 import BottomSheet from "~/components/ui/BottomSheet";
 import Icon from "~/lib/icons/Icon";
@@ -14,12 +14,21 @@ export default function DescriptionSetting() {
   const [description, setDescription] = useState("");
   const [tempDescription, setTempDescription] = useState("");
   const [showBottomSheet, setShowBottomSheet] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { refreshTrigger } = useDataRefresh();
 
   const loadDescription = async () => {
-    const storedDescription = await fetchUserDescription();
-    setDescription(storedDescription);
-    setTempDescription(storedDescription);
+    try {
+      setLoading(true);
+      const storedDescription = await fetchUserDescription();
+      setDescription(storedDescription);
+      setTempDescription(storedDescription);
+    } catch (error) {
+      console.error("Error loading description:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -37,9 +46,18 @@ export default function DescriptionSetting() {
   }, [refreshTrigger]);
 
   const handleSave = async () => {
-    setDescription(tempDescription);
-    await setUserDescription(tempDescription);
-    setShowBottomSheet(false);
+    try {
+      setSaving(true);
+      setDescription(tempDescription);
+      await setUserDescription(tempDescription);
+      setShowBottomSheet(false);
+    } catch (error) {
+      console.error("Error saving description:", error);
+      // Revert on error
+      setTempDescription(description);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -52,14 +70,18 @@ export default function DescriptionSetting() {
       <Pressable
         className="flex-row justify-between items-center py-3"
         onPress={() => setShowBottomSheet(true)}
+        disabled={loading}
       >
         <View className="flex-1">
           <Text className="text-base font-medium text-foreground mb-1">
             About You
           </Text>
           <Text className="text-sm text-muted-foreground">
-            {description ||
-              "Tell us about yourself (e.g., student, professional, etc.)"}
+            {loading 
+              ? "Loading..." 
+              : (description ||
+                  "Tell us about yourself (e.g., student, professional, etc.)")
+            }
           </Text>
         </View>
         <Icon name="ChevronRight" size={16} />
@@ -81,21 +103,30 @@ export default function DescriptionSetting() {
             numberOfLines={4}
             textAlignVertical="top"
             className="mb-6 min-h-24"
+            editable={!saving}
           />
 
           <View className="flex-row gap-3">
             <Pressable
               className="flex-1 bg-muted py-3 rounded-lg items-center"
               onPress={handleCancel}
+              disabled={saving}
             >
               <Text className="text-foreground font-medium">Cancel</Text>
             </Pressable>
 
             <Pressable
-              className="flex-1 bg-primary py-3 rounded-lg items-center"
+              className={`flex-1 py-3 rounded-lg items-center ${
+                saving ? "bg-muted" : "bg-primary"
+              }`}
               onPress={handleSave}
+              disabled={saving}
             >
-              <Text className="text-primary-foreground font-medium">Save</Text>
+              <Text className={`font-medium ${
+                saving ? "text-muted-foreground" : "text-primary-foreground"
+              }`}>
+                {saving ? "Saving..." : "Save"}
+              </Text>
             </Pressable>
           </View>
         </View>

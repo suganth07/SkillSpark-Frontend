@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initializeUserSettings } from '~/queries/user-queries-new';
 
 const USER_SESSION_KEY = '@SkillSpark_user_session';
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
@@ -47,6 +48,14 @@ class AuthService {
       // Store user session
       await this.storeUserSession(user);
       
+      // Initialize user settings after successful registration
+      try {
+        await initializeUserSettings();
+      } catch (error) {
+        console.warn('Failed to initialize user settings after registration:', error);
+        // Don't fail registration if settings initialization fails
+      }
+      
       return user;
     } catch (error) {
       console.error('Registration error:', error);
@@ -82,6 +91,14 @@ class AuthService {
       // Store user session
       await this.storeUserSession(user);
       
+      // Initialize/fetch user settings after successful login
+      try {
+        await initializeUserSettings();
+      } catch (error) {
+        console.warn('Failed to initialize user settings after login:', error);
+        // Don't fail login if settings initialization fails
+      }
+      
       return user;
     } catch (error) {
       console.error('Login error:', error);
@@ -93,6 +110,8 @@ class AuthService {
   async logout(): Promise<void> {
     try {
       await AsyncStorage.removeItem(USER_SESSION_KEY);
+      // Clear user settings cache
+      await AsyncStorage.removeItem('@SkillSpark_user_settings_cache');
     } catch (error) {
       console.error('Logout error:', error);
       throw error;

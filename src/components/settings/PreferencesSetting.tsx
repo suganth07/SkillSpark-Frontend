@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, Pressable } from "react-native";
-import { fetchUser, setUserPreferences } from "~/queries/user-queries";
+import { fetchUserPreferences, setUserPreferences } from "~/queries/user-queries-new";
 import { useColorScheme } from "~/lib/utils/useColorScheme";
 import BottomSheet from "~/components/ui/BottomSheet";
 import Icon from "~/lib/icons/Icon";
@@ -11,17 +11,23 @@ export default function PreferencesSetting() {
   const [videoLength, setVideoLength] = useState("Medium");
   const [showDepthSheet, setShowDepthSheet] = useState(false);
   const [showVideoLengthSheet, setShowVideoLengthSheet] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { isDarkColorScheme } = useColorScheme();
   const { refreshTrigger } = useDataRefresh();
 
   const loadPreferences = async () => {
-    const user = await fetchUser();
-    if (user?.preferences) {
-      setDepth(user.preferences.depth || "Balanced");
-      setVideoLength(user.preferences.videoLength || "Medium");
-    } else {
+    try {
+      setLoading(true);
+      const preferences = await fetchUserPreferences();
+      setDepth(preferences.depth);
+      setVideoLength(preferences.videoLength);
+    } catch (error) {
+      console.error("Error loading preferences:", error);
+      // Set defaults if loading fails
       setDepth("Balanced");
       setVideoLength("Medium");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -34,35 +40,53 @@ export default function PreferencesSetting() {
   }, [refreshTrigger]);
 
   const updatePreferences = async (key: string, value: string) => {
-    const newPreferences = { depth, videoLength, [key]: value };
-    if (key === "depth") setDepth(value);
-    if (key === "videoLength") setVideoLength(value);
-    await setUserPreferences(newPreferences);
+    try {
+      setLoading(true);
+      const newPreferences = { depth, videoLength, [key]: value };
+      if (key === "depth") setDepth(value);
+      if (key === "videoLength") setVideoLength(value);
+      await setUserPreferences(newPreferences);
+    } catch (error) {
+      console.error("Error updating preferences:", error);
+      // Revert the change on error
+      if (key === "depth") setDepth(depth);
+      if (key === "videoLength") setVideoLength(videoLength);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const depthOptions = [
     {
       label: "Fast & Short",
       value: "Fast",
-      description: "Quick overview with minimal details",
+      description: "Quick overview with minimal details (3 topics per level)",
     },
     {
       label: "Balanced",
-      value: "Balanced",
-      description: "Good mix of depth and brevity",
+      value: "Balanced", 
+      description: "Good mix of depth and brevity (4 topics per level)",
     },
     {
       label: "Detailed & Deep",
       value: "Detailed",
-      description: "Comprehensive coverage with examples",
+      description: "Comprehensive coverage with examples (6 topics per level)",
     },
   ];
 
   const videoLengthOptions = [
-    { label: "Short", value: "Short", description: "2-5 minutes per video" },
-    { label: "Medium", value: "Medium", description: "5-15 minutes per video" },
-    { label: "Long", value: "Long", description: "15+ minutes per video" },
+    { label: "Short", value: "Short", description: "8-15 minutes per video" },
+    { label: "Medium", value: "Medium", description: "15-30 minutes per video" },
+    { label: "Long", value: "Long", description: "30+ minutes per video" },
   ];
+
+  if (loading && (!depth && !videoLength)) {
+    return (
+      <View className="mb-6">
+        <Text className="text-muted-foreground">Loading preferences...</Text>
+      </View>
+    );
+  }
 
   return (
     <View className="mb-6">
@@ -76,6 +100,7 @@ export default function PreferencesSetting() {
         <Pressable
           className="flex-row justify-between items-center py-3"
           onPress={() => setShowDepthSheet(true)}
+          disabled={loading}
         >
           <Text className="text-foreground">{depth}</Text>
           <Icon name="ChevronRight" size={16} />
@@ -94,6 +119,7 @@ export default function PreferencesSetting() {
         <Pressable
           className="flex-row justify-between items-center py-3"
           onPress={() => setShowVideoLengthSheet(true)}
+          disabled={loading}
         >
           <Text className="text-foreground">{videoLength}</Text>
           <Icon name="ChevronRight" size={16} />
@@ -118,6 +144,7 @@ export default function PreferencesSetting() {
                 updatePreferences("depth", option.value);
                 setShowDepthSheet(false);
               }}
+              disabled={loading}
             >
               <Text className="text-foreground font-medium mb-1">
                 {option.label}
@@ -148,6 +175,7 @@ export default function PreferencesSetting() {
                 updatePreferences("videoLength", option.value);
                 setShowVideoLengthSheet(false);
               }}
+              disabled={loading}
             >
               <Text className="text-foreground font-medium mb-1">
                 {option.label}

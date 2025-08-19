@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { fetchUser } from "./user-queries";
+import { fetchUserPreferences } from "./user-queries-new";
 import authService from "../services/authService";
 
 const ACTIVE_ROADMAP_KEY = "@SkillSpark_active_roadmap";
@@ -47,6 +48,23 @@ console.log("🔗 Backend URL:", BASE);
 
 async function getUserPreferencesWithDefaults(): Promise<UserPreferences> {
   try {
+    const currentUser = await authService.getCurrentUser();
+    
+    if (currentUser) {
+      // Try to get preferences from backend via new user settings
+      try {
+        const preferences = await fetchUserPreferences();
+        // The preferences returned should already be in the correct format (Fast/Balanced/Detailed)
+        return {
+          depth: preferences.depth as "Fast" | "Balanced" | "Detailed",
+          videoLength: preferences.videoLength as "Short" | "Medium" | "Long"
+        };
+      } catch (error) {
+        console.warn("Could not fetch user preferences from backend, falling back to legacy:", error);
+      }
+    }
+    
+    // Fallback to legacy local storage method
     const user = await fetchUser();
     return (
       user?.preferences || {
@@ -68,16 +86,24 @@ export async function generateRoadmapFromBackend(
 ): Promise<Roadmap> {
   try {
     const preferences = await getUserPreferencesWithDefaults();
+    const currentUser = await authService.getCurrentUser();
+
+    const requestBody: any = {
+      topic,
+      userPreferences: preferences,
+    };
+
+    // Include userId if user is authenticated for personalized roadmaps
+    if (currentUser) {
+      requestBody.userId = currentUser.id;
+    }
 
     const response = await fetch(`${BASE}/api/roadmaps/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        topic,
-        userPreferences: preferences,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

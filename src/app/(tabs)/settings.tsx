@@ -130,7 +130,11 @@ export default function SettingsScreen() {
         />
 
         <SafeAreaView className="flex-1 bg-card">
-          <ScrollView className="flex-1">
+          <ScrollView 
+            className="flex-1"
+            contentContainerStyle={{ paddingBottom: 100 }}
+            showsVerticalScrollIndicator={false}
+          >
             <View className="bg-card px-6 pt-8 py-4 border-b border-border">
               <View className="flex-row items-center justify-between">
                 <View className="flex-1">
