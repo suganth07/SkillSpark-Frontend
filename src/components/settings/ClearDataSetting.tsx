@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, Pressable, Alert } from "react-native";
+import { View, Text, Pressable, Alert, Platform } from "react-native";
 import { clearUserData } from "~/queries/user-queries";
 import userSettingsService from "~/services/userSettingsService";
-import authService from "~/services/authService";
 import BottomSheet from "~/components/ui/BottomSheet";
 import Icon from "~/lib/icons/Icon";
 import { useDataRefresh } from "~/lib/utils/DataRefreshContext";
+import { useAuth } from "~/lib/utils/AuthContext";
 import { router } from "expo-router";
 
 export default function ClearDataSetting() {
@@ -14,18 +14,17 @@ export default function ClearDataSetting() {
   const [clearing, setClearing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const { triggerRefresh } = useDataRefresh();
+  const { user, logout } = useAuth(); // Use AuthContext instead of authService
 
   const handleClearAllData = async () => {
     try {
       setClearing(true);
       
-      // Get current user before clearing
-      const currentUser = await authService.getCurrentUser();
-      
-      if (currentUser) {
+      // Check if user is available from AuthContext
+      if (user) {
         try {
           // Clear all data from backend including roadmaps, videos, etc.
-          await userSettingsService.clearAllUserData(currentUser.id);
+          await userSettingsService.clearAllUserData(user.id);
         } catch (error) {
           console.error("Error clearing backend data:", error);
           Alert.alert(
@@ -58,46 +57,77 @@ export default function ClearDataSetting() {
     try {
       setDeleting(true);
       
-      // Get current user before deletion
-      const currentUser = await authService.getCurrentUser();
+      // Use user from AuthContext instead of calling authService
+      console.log("Current user for deletion:", user); // Debug log
       
-      if (!currentUser) {
-        Alert.alert("Error", "No user account found to delete.");
+      if (!user) {
+        console.warn("No current user found for account deletion");
+        if (Platform.OS === 'web') {
+          console.error("No user account found to delete. Please try logging in again.");
+        } else {
+          Alert.alert("Error", "No user account found to delete. Please try logging in again.");
+        }
+        setDeleting(false);
         return;
       }
 
       try {
-        // Delete account completely from backend
-        await userSettingsService.deleteUserAccount(currentUser.id);
+        console.log("Attempting to delete account for user ID:", user.id);
         
-        // Clear local data
+        // Delete account completely from backend
+        await userSettingsService.deleteUserAccount(user.id);
+        console.log("Account deleted successfully from backend");
+        
+        // Clear local data and logout using AuthContext
         await clearUserData();
+        console.log("Local data cleared");
         
         setShowDeleteBottomSheet(false);
         
-        Alert.alert(
-          "Account Deleted", 
-          "Your account and all associated data have been permanently deleted.",
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                // Navigate to login/welcome screen
-                router.replace('/auth/login');
+        // Handle success feedback differently for web vs mobile
+        if (Platform.OS === 'web') {
+          console.log("Account deleted successfully - redirecting to login");
+          // For web, logout and navigate directly
+          await logout();
+          router.replace('/auth/login');
+        } else {
+          // For mobile, show success alert then redirect
+          Alert.alert(
+            "Account Deleted", 
+            "Your account and all associated data have been permanently deleted.",
+            [
+              {
+                text: "OK",
+                onPress: async () => {
+                  console.log("Redirecting to login page");
+                  await logout();
+                  router.replace('/(tabs)/');
+                  setTimeout(() => {
+                    router.replace('/auth/login');
+                  }, 100);
+                }
               }
-            }
-          ]
-        );
+            ]
+          );
+        }
       } catch (error) {
-        console.error("Error deleting account:", error);
-        Alert.alert(
-          "Error", 
-          "Failed to delete your account. Please try again or contact support."
-        );
+        console.error("Error deleting account from backend:", error);
+        if (Platform.OS === 'web') {
+          console.error("Failed to delete account:", error);
+        } else {
+          Alert.alert(
+            "Error", 
+            "Failed to delete your account. Please check your connection and try again."
+          );
+        }
       }
     } catch (error) {
       console.error("Error in delete account flow:", error);
-      Alert.alert("Error", "An unexpected error occurred.");
+      if (Platform.OS === 'web') {
+        console.error("Unexpected error during account deletion:", error);
+      } else {
+        Alert.alert("Error", "An unexpected error occurred while deleting your account.");
+      }
     } finally {
       setDeleting(false);
     }
@@ -106,25 +136,16 @@ export default function ClearDataSetting() {
   const showDeleteConfirmation = () => {
     console.log("Delete account button pressed"); // Debug log
     
-    Alert.alert(
-      "Delete Account",
-      "Are you absolutely sure you want to delete your account? This action cannot be undone and will permanently remove:\n\n• Your account and profile\n• All roadmaps and progress\n• All saved videos and playlists\n• All settings and preferences\n• Everything associated with your account",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-          onPress: () => console.log("Delete cancelled")
-        },
-        {
-          text: "Delete Account",
-          style: "destructive",
-          onPress: () => {
-            console.log("Delete confirmed, showing bottom sheet");
-            setShowDeleteBottomSheet(true);
-          }
-        }
-      ]
-    );
+    // For web, directly show the bottom sheet since Alert.alert doesn't work properly
+    if (Platform.OS === 'web') {
+      console.log("Web platform detected - showing delete bottom sheet directly");
+      setShowDeleteBottomSheet(true);
+      return;
+    }
+    
+    // For mobile platforms, show the Alert first
+    setShowDeleteBottomSheet(true);
+    
   };
 
   return (
@@ -146,7 +167,8 @@ export default function ClearDataSetting() {
             }
           </Text>
         </View>
-        <Icon name="ChevronRight" size={16} />
+        {/* Temporarily remove icons to prevent crash */}
+        <Text className="text-muted-foreground">›</Text>
       </Pressable>
 
       {/* Delete Account Button */}
@@ -169,7 +191,8 @@ export default function ClearDataSetting() {
             }
           </Text>
         </View>
-        <Icon name="ChevronRight" size={16} />
+        {/* Temporarily remove icons to prevent crash */}
+        <Text className="text-muted-foreground">›</Text>
       </Pressable>
 
       {/* Clear Data Bottom Sheet */}
@@ -223,18 +246,23 @@ export default function ClearDataSetting() {
       >
         <View className="p-4">
           <Text className="text-xl font-bold text-destructive mb-2">
-            Delete Account
+            ⚠️ Delete Account
           </Text>
-          <Text className="text-muted-foreground mb-4 leading-6">
-            This action is PERMANENT and cannot be undone. Your account and ALL associated data will be deleted forever.
+          <Text className="text-muted-foreground mb-2 leading-6">
+            {Platform.OS === 'web' ? (
+              'Are you absolutely sure you want to delete your account? This action cannot be undone and will permanently remove:'
+            ) : (
+              'This action is PERMANENT and cannot be undone. Your account and ALL associated data will be deleted forever.'
+            )}
           </Text>
           <Text className="text-destructive mb-6 leading-6 font-medium">
-            ⚠️ This will permanently delete:
-            {"\n"}• Your entire account
-            {"\n"}• All roadmaps and progress
-            {"\n"}• All videos and playlists
+            🔥 This will permanently delete:
+            {"\n"}• Your entire account and profile
+            {"\n"}• All roadmaps and learning progress
+            {"\n"}• All saved videos and playlists
             {"\n"}• All settings and personal data
             {"\n"}• Everything associated with your account
+            {Platform.OS === 'web' ? '\n\n⚠️ THIS ACTION CANNOT BE UNDONE!' : ''}
           </Text>
 
           <View className="flex-row gap-3">
@@ -256,7 +284,7 @@ export default function ClearDataSetting() {
               <Text className={`font-medium ${
                 deleting ? "text-muted-foreground" : "text-destructive-foreground"
               }`}>
-                {deleting ? "Deleting..." : "Delete Account"}
+                {deleting ? "Deleting..." : "🗑️ Delete Account"}
               </Text>
             </Pressable>
           </View>
