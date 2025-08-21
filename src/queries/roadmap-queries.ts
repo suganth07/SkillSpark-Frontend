@@ -532,16 +532,16 @@ export async function generatePlaylistsFromBackend(
     const preferences = await getUserPreferencesWithDefaults();
     const currentUser = await authService.getCurrentUser();
 
-    // If roadmapId and level are provided, first check if videos exist in Supabase
+    // If roadmapId and level are provided, first check if videos exist in database
     if (roadmapId && level && currentUser) {
       try {
-        const existingVideosResponse = await loadVideosFromSupabase(roadmapId, level);
+        const existingVideosResponse = await loadVideosFromDatabase(roadmapId, level);
         if (existingVideosResponse && existingVideosResponse.videos.length > 0) {
-          console.log(`✅ Found existing videos in Supabase for ${topic} (${level}):`, existingVideosResponse.videos.length);
+          console.log(`✅ Found existing videos in database for ${topic} (${level}):`, existingVideosResponse.videos.length);
           return existingVideosResponse.videos;
         }
       } catch (error) {
-        console.log(`📹 No existing videos found in Supabase, generating new ones...`);
+        console.log(`📹 No existing videos found in database, generating new ones...`);
       }
     }
 
@@ -582,15 +582,15 @@ export async function generatePlaylistsFromBackend(
   }
 }
 
-// Add new function to load videos from Supabase with pagination support
-export async function loadVideosFromSupabase(roadmapId: string, level: string, page: number = 1): Promise<{videos: PlaylistItem[], hasMore: boolean}> {
+// Add new function to load videos from database with pagination support
+export async function loadVideosFromDatabase(roadmapId: string, level: string, page: number = 1): Promise<{videos: PlaylistItem[], hasMore: boolean}> {
   try {
     const currentUser = await authService.getCurrentUser();
     if (!currentUser) {
       throw new Error('User not authenticated');
     }
 
-    console.log(`📹 Loading videos from Supabase for roadmap: ${roadmapId}, level: ${level}, page: ${page}`);
+    console.log(`📹 Loading videos from database for roadmap: ${roadmapId}, level: ${level}, page: ${page}`);
     
     const response = await fetch(`${BASE}/api/users/videos/${roadmapId}?level=${level}&userId=${currentUser.id}&page=${page}`, {
       method: 'GET',
@@ -609,14 +609,14 @@ export async function loadVideosFromSupabase(roadmapId: string, level: string, p
       throw new Error(result.error?.message || "Failed to load videos");
     }
     
-    console.log(`✅ Loaded videos from Supabase:`, result.data?.videos?.length || 0, 'videos, hasMore:', result.data?.hasMore);
+    console.log(`✅ Loaded videos from database:`, result.data?.videos?.length || 0, 'videos, hasMore:', result.data?.hasMore);
     
     return {
       videos: result.data?.videos || [],
       hasMore: result.data?.hasMore || false
     };
   } catch (error) {
-    console.error('❌ Error loading videos from Supabase:', error);
+    console.error('❌ Error loading videos from database:', error);
     throw error;
   }
 }
@@ -790,7 +790,7 @@ export async function fetchVideosWithPagination(
 
     console.log(`📹 Fetching videos with pagination for roadmap: ${roadmapId}, level: ${level}, page: ${page}`);
     
-    const response = await loadVideosFromSupabase(roadmapId, level, page);
+    const response = await loadVideosFromDatabase(roadmapId, level, page);
     return response;
   } catch (error) {
     console.error('❌ Error fetching videos with pagination:', error);

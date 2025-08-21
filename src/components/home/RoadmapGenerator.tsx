@@ -3,7 +3,6 @@ import { View, Text, TextInput, Alert } from "react-native";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import Icon from "~/lib/icons/Icon";
-import SuccessAlert from "~/components/ui/SuccessAlert";
 import { useColorScheme } from "~/lib/utils/useColorScheme";
 import { useRoadmapData } from "~/lib/utils/RoadmapDataContext";
 import { generateNewRoadmap } from "~/queries/roadmap-queries";
@@ -20,14 +19,15 @@ import Animated, {
 
 interface RoadmapGeneratorProps {
   onRoadmapGenerated?: () => void;
+  onShowSuccess?: (topic: string) => void;
 }
 
 export default function RoadmapGenerator({
   onRoadmapGenerated,
+  onShowSuccess,
 }: RoadmapGeneratorProps) {
   const [topic, setTopic] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [generatedTopic, setGeneratedTopic] = useState("");
   const { isDarkColorScheme } = useColorScheme();
   const { setActiveRoadmap, refreshData } = useRoadmapData();
@@ -75,7 +75,7 @@ export default function RoadmapGenerator({
       });
 
       setGeneratedTopic(topic.trim());
-      setShowSuccessAlert(true);
+      onShowSuccess?.(topic.trim());
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error occurred";
@@ -244,18 +244,6 @@ export default function RoadmapGenerator({
           </Text>
         </View>
       </Card>
-
-      <SuccessAlert
-        visible={showSuccessAlert}
-        title="Success!"
-        message={`Generated roadmap for "${generatedTopic}". Check it out below!`}
-        onDismiss={() => {
-          setShowSuccessAlert(false);
-          setTopic("");
-          onRoadmapGenerated?.();
-        }}
-        buttonText="Awesome!"
-      />
     </Animated.View>
   );
 }

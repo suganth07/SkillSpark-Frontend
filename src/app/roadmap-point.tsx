@@ -150,7 +150,7 @@ export default function RoadmapPointScreen() {
     try {
       setLoadingPlaylists(true);
       
-      // Try to fetch videos from Supabase with pagination
+      // Try to fetch videos from database with pagination
       try {
         const videosResponse = await fetchVideosWithPagination(roadmapId, pointData.level, 1);
         if (videosResponse.videos.length > 0) {
@@ -160,7 +160,7 @@ export default function RoadmapPointScreen() {
           return;
         }
       } catch (error) {
-        console.log("No videos found in Supabase, checking local storage...");
+        console.log("No videos found in database, checking local storage...");
       }
 
       // Fallback to checking local storage and generating if needed
