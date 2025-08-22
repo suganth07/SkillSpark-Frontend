@@ -11,7 +11,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Card, CardContent } from "~/components/ui/card";
-import { ConfirmationModal } from "~/components/ui/confirmation-modal";
 import Icon from "~/lib/icons/Icon";
 import { YouTubeIcon } from "~/lib/icons/YouTube";
 import { Spinner } from "~/components/ui/spinner";
@@ -58,8 +57,12 @@ export default function RoadmapPointScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMorePages, setHasMorePages] = useState(false);
   const [loadingMorePages, setLoadingMorePages] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const pulseScale = useSharedValue(1);
+
+  // Debug modal visibility changes
+  useEffect(() => {
+    console.log("📋 Component state changed");
+  }, []);
 
   useEffect(() => {
     pulseScale.value = withRepeat(
@@ -304,25 +307,36 @@ export default function RoadmapPointScreen() {
 
   const handleRegeneratePlaylists = async () => {
     console.log("🔄 Regenerate button clicked!");
-    console.log("📋 Current values:", { point: !!point, roadmapId, pointId, roadmapTopic });
+    console.log("📋 Current values:", { point: !!point, pointId, roadmapId, roadmapTopic });
+    console.log("📋 Platform:", Platform.OS);
     
     if (!point || !roadmapId || !pointId) {
-      console.log("❌ Missing required values:", { point: !!point, roadmapId, pointId });
+      console.log("❌ Missing required values:", { point: !!point, pointId, roadmapId });
       return;
     }
 
-    console.log("✅ All values present, showing confirmation modal...");
-    setShowConfirmModal(true);
-  };
-
-  const handleConfirmRegeneration = async () => {
-    setShowConfirmModal(false);
-    await executeRegeneration();
-  };
-
-  const handleCancelRegeneration = () => {
-    console.log("❌ User cancelled regeneration");
-    setShowConfirmModal(false);
+    console.log("✅ All values present, showing confirmation alert...");
+    
+    Alert.alert(
+      "Regenerate Videos",
+      "This will generate new learning videos for this topic. Your current videos will be moved to previous pages. Continue?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => {
+            console.log("❌ User cancelled regeneration");
+          }
+        },
+        {
+          text: "Regenerate",
+          onPress: async () => {
+            console.log("✅ User confirmed regeneration");
+            await executeRegeneration();
+          }
+        }
+      ]
+    );
   };
 
   const handleToggleCompletion = async () => {
@@ -673,17 +687,6 @@ export default function RoadmapPointScreen() {
         </Animated.View>
       </SafeAreaView>
 
-      {/* Confirmation Modal */}
-      <ConfirmationModal
-        visible={showConfirmModal}
-        title="Regenerate Videos"
-        message="This will generate new learning videos for this topic. Your current videos will be moved to previous pages. Continue?"
-        confirmText="Regenerate"
-        cancelText="Cancel"
-        onConfirm={handleConfirmRegeneration}
-        onCancel={handleCancelRegeneration}
-        isLoading={regeneratingPlaylists}
-      />
     </View>
   );
 }
