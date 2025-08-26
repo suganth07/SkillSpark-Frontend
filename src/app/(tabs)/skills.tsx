@@ -28,6 +28,12 @@ export default function SkillsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [roadmapToDelete, setRoadmapToDelete] = useState<Roadmap | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [paginatedRoadmaps, setPaginatedRoadmaps] = useState<Roadmap[]>([]);
+  const itemsPerPage = 5; // 5 roadmaps per page as requested
+  
   const router = useRouter();
   const { isDarkColorScheme } = useColorScheme();
 
@@ -118,6 +124,41 @@ export default function SkillsScreen() {
       setFilteredRoadmaps(filtered);
     }
   }, [searchQuery, roadmaps]);
+
+  // Update pagination when filtered roadmaps change
+  useEffect(() => {
+    updatePagination();
+  }, [filteredRoadmaps, currentPage]);
+
+  const updatePagination = () => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginated = filteredRoadmaps.slice(startIndex, endIndex);
+    setPaginatedRoadmaps(paginated);
+  };
+
+  const totalPages = Math.ceil(filteredRoadmaps.length / itemsPerPage);
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -218,6 +259,85 @@ export default function SkillsScreen() {
     );
   };
 
+  const renderPaginationControls = () => {
+    // Show pagination controls when there are more than 3 roadmaps (to see pagination with current data)
+    // For production with 5 per page, you might want: if (filteredRoadmaps.length <= itemsPerPage) return null;
+    if (filteredRoadmaps.length <= 3) return null;
+
+    return (
+      <View className="px-4 py-6 pb-12 border-t border-border/30 bg-background/95 backdrop-blur-sm mx-4 mb-8 rounded-lg shadow-sm">
+        <View className="flex-row items-center justify-between mb-6">
+          <Text className="text-sm text-muted-foreground font-medium">
+            Showing {Math.min((currentPage - 1) * itemsPerPage + 1, filteredRoadmaps.length)}-{Math.min(currentPage * itemsPerPage, filteredRoadmaps.length)} of {filteredRoadmaps.length} roadmaps
+          </Text>
+          <Text className="text-sm text-muted-foreground font-medium">
+            Page {currentPage} of {totalPages}
+          </Text>
+        </View>
+        
+        <View className="flex-row items-center justify-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={handlePreviousPage}
+            disabled={currentPage === 1}
+            className={`px-4 py-3 mr-3 ${currentPage === 1 ? 'opacity-50' : ''}`}
+          >
+            <View className="flex-row items-center">
+              <Icon name="ChevronLeft" size={16} className="text-foreground" />
+              <Text className="text-foreground text-sm ml-1 font-medium">Prev</Text>
+            </View>
+          </Button>
+
+          <View className="flex-row items-center mx-4">
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              let page: number;
+              if (totalPages <= 5) {
+                page = i + 1;
+              } else {
+                // Smart pagination for more than 5 pages
+                if (currentPage <= 3) {
+                  page = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  page = totalPages - 4 + i;
+                } else {
+                  page = currentPage - 2 + i;
+                }
+              }
+              
+              return (
+                <Button
+                  key={page}
+                  variant={page === currentPage ? "default" : "outline"}
+                  size="sm"
+                  onPress={() => handlePageChange(page)}
+                  className={`w-12 h-12 mx-1 ${page === currentPage ? 'bg-primary border-primary' : 'bg-transparent border-border'}`}
+                >
+                  <Text className={`text-sm font-bold ${page === currentPage ? 'text-primary-foreground' : 'text-foreground'}`}>
+                    {page}
+                  </Text>
+                </Button>
+              );
+            })}
+          </View>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={handleNextPage}
+            disabled={currentPage === totalPages}
+            className={`px-4 py-3 ml-3 ${currentPage === totalPages ? 'opacity-50' : ''}`}
+          >
+            <View className="flex-row items-center">
+              <Text className="text-foreground text-sm mr-1 font-medium">Next</Text>
+              <Icon name="ChevronRight" size={16} className="text-foreground" />
+            </View>
+          </Button>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View className="flex-1">
       <AnimatedLinearGradient
@@ -238,10 +358,11 @@ export default function SkillsScreen() {
 
       <SafeAreaView className="flex-1 bg-transparent">
         <FlatList
-          data={filteredRoadmaps}
+          data={paginatedRoadmaps}
           renderItem={renderRoadmapCard}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior="automatic"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -281,7 +402,12 @@ export default function SkillsScreen() {
             </>
           }
           ListEmptyComponent={!loading ? renderEmpty : null}
-          ListFooterComponent={<View className="h-6" />}
+          ListFooterComponent={
+            <>
+              {renderPaginationControls()}
+              <View className="h-32" />
+            </>
+          }
           contentContainerStyle={{ flexGrow: 1 }}
         />
 
