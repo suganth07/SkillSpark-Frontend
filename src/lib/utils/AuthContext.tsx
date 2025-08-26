@@ -7,6 +7,7 @@ interface AuthContextType {
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;
+  refreshAuthState: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     register,
     logout,
+    refreshAuthState: checkAuthState,
     isAuthenticated: user !== null,
   };
 

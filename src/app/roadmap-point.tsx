@@ -315,8 +315,9 @@ export default function RoadmapPointScreen() {
       return;
     }
 
-    console.log("✅ All values present, showing confirmation alert...");
+    console.log("✅ All values present, showing confirmation...");
     
+    // Use native Alert for confirmation
     Alert.alert(
       "Regenerate Videos",
       "This will generate new learning videos for this topic. Your current videos will be moved to previous pages. Continue?",
@@ -324,17 +325,16 @@ export default function RoadmapPointScreen() {
         {
           text: "Cancel",
           style: "cancel",
-          onPress: () => {
-            console.log("❌ User cancelled regeneration");
-          }
+          onPress: () => console.log("❌ User cancelled regeneration"),
         },
         {
           text: "Regenerate",
+          style: "default",
           onPress: async () => {
             console.log("✅ User confirmed regeneration");
             await executeRegeneration();
-          }
-        }
+          },
+        },
       ]
     );
   };
@@ -686,7 +686,6 @@ export default function RoadmapPointScreen() {
           </ScrollView>
         </Animated.View>
       </SafeAreaView>
-
     </View>
   );
 }

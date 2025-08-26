@@ -723,6 +723,13 @@ export async function generateNewRoadmap(topic: string): Promise<Roadmap> {
   try {
     console.log("🚀 Generating new roadmap for topic:", topic);
     
+    // Check authentication first
+    const currentUser = await authService.getCurrentUser();
+    if (!currentUser) {
+      throw new Error("User not authenticated");
+    }
+    console.log("✅ User authenticated:", currentUser.id);
+    
     // Generate roadmap from backend API
     const roadmap = await generateRoadmapFromBackend(topic);
     console.log("✅ Roadmap generated:", roadmap);

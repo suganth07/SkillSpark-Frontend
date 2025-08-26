@@ -12,9 +12,9 @@ export default function ClearDataSetting() {
   const [showClearBottomSheet, setShowClearBottomSheet] = useState(false);
   const [showDeleteBottomSheet, setShowDeleteBottomSheet] = useState(false);
   const [clearing, setClearing] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [deleting,  setDeleting] = useState(false);
   const { triggerRefresh } = useDataRefresh();
-  const { user, logout } = useAuth(); // Use AuthContext instead of authService
+  const { user, logout, refreshAuthState } = useAuth(); // Add refreshAuthState
 
   const handleClearAllData = async () => {
     try {
@@ -37,6 +37,9 @@ export default function ClearDataSetting() {
       
       // Clear local data
       await clearUserData();
+      
+      // Refresh auth state to ensure AuthContext has the correct user info
+      await refreshAuthState();
       
       setShowClearBottomSheet(false);
       triggerRefresh();
@@ -78,56 +81,27 @@ export default function ClearDataSetting() {
         await userSettingsService.deleteUserAccount(user.id);
         console.log("Account deleted successfully from backend");
         
-        // Clear local data and logout using AuthContext
+        // Clear local data
         await clearUserData();
         console.log("Local data cleared");
         
         setShowDeleteBottomSheet(false);
         
-        // Handle success feedback differently for web vs mobile
-        if (Platform.OS === 'web') {
-          console.log("Account deleted successfully - redirecting to login");
-          // For web, logout and navigate directly
-          await logout();
-          router.replace('/auth/login');
-        } else {
-          // For mobile, show success alert then redirect
-          Alert.alert(
-            "Account Deleted", 
-            "Your account and all associated data have been permanently deleted.",
-            [
-              {
-                text: "OK",
-                onPress: async () => {
-                  console.log("Redirecting to login page");
-                  await logout();
-                  router.replace('/(tabs)/');
-                  setTimeout(() => {
-                    router.replace('/auth/login');
-                  }, 100);
-                }
-              }
-            ]
-          );
-        }
+        // Logout and redirect to login
+        console.log("Redirecting to login page");
+        await logout();
+        router.replace('/auth/login');
+        
       } catch (error) {
         console.error("Error deleting account from backend:", error);
-        if (Platform.OS === 'web') {
-          console.error("Failed to delete account:", error);
-        } else {
-          Alert.alert(
-            "Error", 
-            "Failed to delete your account. Please check your connection and try again."
-          );
-        }
+        Alert.alert(
+          "Error", 
+          "Failed to delete your account. Please check your connection and try again."
+        );
       }
     } catch (error) {
       console.error("Error in delete account flow:", error);
-      if (Platform.OS === 'web') {
-        console.error("Unexpected error during account deletion:", error);
-      } else {
-        Alert.alert("Error", "An unexpected error occurred while deleting your account.");
-      }
+      Alert.alert("Error", "An unexpected error occurred while deleting your account.");
     } finally {
       setDeleting(false);
     }
@@ -256,7 +230,7 @@ export default function ClearDataSetting() {
             )}
           </Text>
           <Text className="text-destructive mb-6 leading-6 font-medium">
-            🔥 This will permanently delete:
+            ⚠️ This will permanently delete:
             {"\n"}• Your entire account and profile
             {"\n"}• All roadmaps and learning progress
             {"\n"}• All saved videos and playlists

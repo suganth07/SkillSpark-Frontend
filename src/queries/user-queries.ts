@@ -39,7 +39,28 @@ export async function setUserPreferences(preferences: any) {
 
 export async function clearUserData() {
   try {
-    await AsyncStorage.clear();
+    // Clear only user data keys, preserving authentication session
+    const keysToRemove = [
+      "@SkillSpark_user",                    // Legacy user data
+      "@SkillSpark_user_settings_cache",    // User settings cache
+      "@SkillSpark_active_roadmap",         // Active roadmap
+      // Note: We're NOT removing @SkillSpark_user_session to keep user authenticated
+    ];
+    
+    // Remove specific keys instead of clearing everything
+    await Promise.all(keysToRemove.map(key => AsyncStorage.removeItem(key)));
+    
+    // Also get all keys and remove any other SkillSpark data keys except user session
+    const allKeys = await AsyncStorage.getAllKeys();
+    const otherSkillSparkKeys = allKeys.filter(key => 
+      key.startsWith('@SkillSpark_') && 
+      key !== '@SkillSpark_user_session' // Preserve authentication
+    );
+    
+    if (otherSkillSparkKeys.length > 0) {
+      await Promise.all(otherSkillSparkKeys.map(key => AsyncStorage.removeItem(key)));
+    }
+    
   } catch (error) {
     console.error("Error clearing storage:", error);
   }

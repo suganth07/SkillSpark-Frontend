@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, Pressable } from "react-native";
+import { View, Text, TouchableOpacity, Pressable, Alert } from "react-native";
 import { Card } from "~/components/ui/card";
-import { ConfirmationModal } from "~/components/ui/confirmation-modal";
 import Icon from "~/lib/icons/Icon";
 import { Roadmap } from "~/queries/roadmap-queries";
 import Animated, {
@@ -31,7 +30,6 @@ export default function RoadmapCard({
   const translateY = useSharedValue(30);
   const pressScale = useSharedValue(1);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -126,19 +124,10 @@ export default function RoadmapCard({
 
   const handleDeletePress = (e: any) => {
     e.stopPropagation(); // Prevent triggering the card press
-    setShowDeleteModal(true);
-  };
-
-  const handleConfirmDelete = () => {
-    setShowDeleteModal(false);
     if (onDelete) {
       setIsDeleting(true);
       onDelete(roadmap.id);
     }
-  };
-
-  const handleCancelDelete = () => {
-    setShowDeleteModal(false);
   };
 
   return (
@@ -226,18 +215,6 @@ export default function RoadmapCard({
           </View>
         </Card>
       </Pressable>
-
-      {/* Delete Confirmation Modal */}
-      <ConfirmationModal
-        visible={showDeleteModal}
-        title="Delete Roadmap"
-        message={`Are you sure you want to delete "${roadmap.topic}"? This action cannot be undone and will remove all your progress.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        onConfirm={handleConfirmDelete}
-        onCancel={handleCancelDelete}
-        isLoading={isDeleting}
-      />
     </Animated.View>
   );
 }

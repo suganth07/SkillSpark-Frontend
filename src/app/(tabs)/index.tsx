@@ -5,6 +5,7 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -22,7 +23,6 @@ import HeroSection from "~/components/home/HeroSection";
 import RoadmapGenerator from "~/components/home/RoadmapGenerator";
 import ActiveRoadmapDisplay from "~/components/home/ActiveRoadmapDisplay";
 import LearningStats from "~/components/home/LearningStats";
-import SuccessAlert from "~/components/ui/SuccessAlert";
 import { useColorScheme } from "~/lib/utils/useColorScheme";
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
@@ -30,7 +30,6 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [generatedTopic, setGeneratedTopic] = useState("");
   const { isDarkColorScheme } = useColorScheme();
 
@@ -86,7 +85,11 @@ export default function HomeScreen() {
 
   const handleShowSuccess = (topic: string) => {
     setGeneratedTopic(topic);
-    setShowSuccessAlert(true);
+    Alert.alert(
+      "Success!",
+      `Generated roadmap for '${topic}'. Check it out below!`,
+      [{ text: "Awesome!", style: "default" }]
+    );
   };
 
   useFocusEffect(
@@ -148,17 +151,6 @@ export default function HomeScreen() {
             />
           </ScrollView>
         </SafeAreaView>
-
-        <SuccessAlert
-          visible={showSuccessAlert}
-          title="Success!"
-          message={`Generated roadmap for "${generatedTopic}". Check it out below!`}
-          onDismiss={() => {
-            setShowSuccessAlert(false);
-            setGeneratedTopic("");
-          }}
-          buttonText="Awesome!"
-        />
       </View>
     </KeyboardAvoidingView>
   );

@@ -27,6 +27,7 @@ export default function SkillsScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [roadmapToDelete, setRoadmapToDelete] = useState<Roadmap | null>(null);
   const router = useRouter();
   const { isDarkColorScheme } = useColorScheme();
 
@@ -132,18 +133,34 @@ export default function SkillsScreen() {
   };
 
   const handleDeleteRoadmap = async (roadmapId: string) => {
-    try {
-      await deleteRoadmap(roadmapId);
-      
-      // Remove from local state
-      setRoadmaps(prevRoadmaps => prevRoadmaps.filter(r => r.id !== roadmapId));
-      setFilteredRoadmaps(prevFiltered => prevFiltered.filter(r => r.id !== roadmapId));
-      
-      Alert.alert("Success", "Roadmap deleted successfully");
-    } catch (error) {
-      console.error("Error deleting roadmap:", error);
-      Alert.alert("Error", "Failed to delete roadmap. Please try again.");
-    }
+    const roadmapToDelete = roadmaps.find(r => r.id === roadmapId);
+    if (!roadmapToDelete) return;
+
+    Alert.alert(
+      "Delete Roadmap?",
+      `Are you sure you want to delete '${roadmapToDelete.topic}'? This action cannot be undone and will remove all your progress.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteRoadmap(roadmapToDelete.id);
+              
+              // Remove from local state
+              setRoadmaps(prevRoadmaps => prevRoadmaps.filter(r => r.id !== roadmapToDelete.id));
+              setFilteredRoadmaps(prevFiltered => prevFiltered.filter(r => r.id !== roadmapToDelete.id));
+              
+              Alert.alert("Success!", "Roadmap deleted successfully!");
+            } catch (error) {
+              console.error("Error deleting roadmap:", error);
+              Alert.alert("Error", "Failed to delete roadmap. Please try again.");
+            }
+          }
+        }
+      ]
+    );
   };
 
   const headerStyle = useAnimatedStyle(() => ({
