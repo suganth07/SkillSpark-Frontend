@@ -75,6 +75,82 @@ class ApiClient {
 // Create and export API client instance
 export const apiClient = new ApiClient(BACKEND_URL);
 
+// Video Generation API Methods
+export const VideoAPI = {
+  // Generate videos for a single point
+  async generatePointVideos(userRoadmapId: string, level: string, topic: string, pointId: string, page = 1) {
+    try {
+      const response = await apiClient.post('/api/playlist/generate', {
+        userRoadmapId,
+        level,
+        topic,
+        pointId,
+        page
+      });
+      return response;
+    } catch (error) {
+      console.error('Error generating point videos:', error);
+      throw error;
+    }
+  },
+
+  // Generate videos for all points in a level (bulk generation)
+  async generateBulkVideos(userRoadmapId: string, level: string, topic: string, points: any[], page = 1) {
+    try {
+      const response = await apiClient.post('/api/playlist/generate-bulk', {
+        userRoadmapId,
+        level,
+        topic,
+        points,
+        page
+      });
+      return response;
+    } catch (error) {
+      console.error('Error generating bulk videos:', error);
+      throw error;
+    }
+  },
+
+  // Get videos for a specific point
+  async getPointVideos(userRoadmapId: string, level: string, pointId: string, page = 1) {
+    try {
+      const response = await apiClient.get(`/api/playlist/user/${userRoadmapId}/${level}?page=${page}&pointId=${pointId}`);
+      return response;
+    } catch (error) {
+      console.error('Error fetching point videos:', error);
+      throw error;
+    }
+  },
+
+  // Get all point videos for a level
+  async getAllPointVideosForLevel(userRoadmapId: string, level: string, page = 1) {
+    try {
+      const response = await apiClient.get(`/api/playlist/point-videos/${userRoadmapId}/${level}?page=${page}`);
+      return response;
+    } catch (error) {
+      console.error('Error fetching all point videos:', error);
+      throw error;
+    }
+  },
+
+  // Regenerate videos for a specific point
+  async regeneratePointVideos(userRoadmapId: string, level: string, topic: string, pointId: string, page = 1) {
+    try {
+      const response = await apiClient.post('/api/playlist/regenerate', {
+        userRoadmapId,
+        level,
+        topic,
+        pointId,
+        page
+      });
+      return response;
+    } catch (error) {
+      console.error('Error regenerating point videos:', error);
+      throw error;
+    }
+  }
+};
+
 // User Storage Helper (replacing legacy auth storage with Neon-backed authentication)
 export const UserStorage = {
   async getUser() {

@@ -155,7 +155,7 @@ export default function RoadmapPointScreen() {
       
       // Try to fetch videos from database with pagination
       try {
-        const videosResponse = await fetchVideosWithPagination(roadmapId, pointData.level, 1);
+        const videosResponse = await fetchVideosWithPagination(roadmapId, pointData.level, 1, pointId);
         if (videosResponse.videos.length > 0) {
           setPlaylists(videosResponse.videos);
           setCurrentPage(1);
@@ -199,7 +199,7 @@ export default function RoadmapPointScreen() {
     try {
       setLoadingMorePages(true);
       const nextPage = currentPage + 1;
-      const videosResponse = await fetchVideosWithPagination(roadmapId, point.level, nextPage);
+      const videosResponse = await fetchVideosWithPagination(roadmapId, point.level, nextPage, pointId);
       
       setPlaylists(videosResponse.videos); // Replace videos instead of appending
       setCurrentPage(nextPage);
@@ -218,14 +218,14 @@ export default function RoadmapPointScreen() {
     try {
       setLoadingMorePages(true);
       const previousPage = currentPage - 1;
-      const videosResponse = await fetchVideosWithPagination(roadmapId, point.level, previousPage);
+      const videosResponse = await fetchVideosWithPagination(roadmapId, point.level, previousPage, pointId);
       
       setPlaylists(videosResponse.videos); // Replace videos instead of appending
       setCurrentPage(previousPage);
       
       // Check if there are more pages after the previous page (which would be the current page)
       try {
-        const checkNextPage = await fetchVideosWithPagination(roadmapId, point.level, previousPage + 1);
+        const checkNextPage = await fetchVideosWithPagination(roadmapId, point.level, previousPage + 1, pointId);
         setHasMorePages(checkNextPage.videos.length > 0 || checkNextPage.hasMore);
       } catch (error) {
         // If we can't check the next page, assume there are more pages
@@ -269,7 +269,7 @@ export default function RoadmapPointScreen() {
       // After regeneration, reload the first page to get the new videos
       try {
         console.log("📄 Fetching first page of videos...");
-        const videosResponse = await fetchVideosWithPagination(roadmapId, point.level, 1);
+        const videosResponse = await fetchVideosWithPagination(roadmapId, point.level, 1, pointId);
         setPlaylists(videosResponse.videos);
         setCurrentPage(1);
         setHasMorePages(videosResponse.hasMore);
