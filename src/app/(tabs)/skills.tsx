@@ -173,6 +173,19 @@ export default function SkillsScreen() {
     });
   };
 
+  const handleQuizPress = (roadmapId: string) => {
+    const roadmap = roadmaps.find(r => r.id === roadmapId);
+    if (!roadmap) return;
+
+    router.push({
+      pathname: "/quiz",
+      params: { 
+        userRoadmapId: roadmap.id,
+        topic: roadmap.topic
+      },
+    });
+  };
+
   const handleDeleteRoadmap = async (roadmapId: string) => {
     const roadmapToDelete = roadmaps.find(r => r.id === roadmapId);
     if (!roadmapToDelete) return;
@@ -220,6 +233,7 @@ export default function SkillsScreen() {
       roadmap={item}
       onPress={() => handleRoadmapPress(item)}
       onDelete={handleDeleteRoadmap}
+      onQuizPress={handleQuizPress}
       delay={index * 100}
     />
   );

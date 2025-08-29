@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, Pressable, Alert } from "react-native";
 import { Card } from "~/components/ui/card";
 import Icon from "~/lib/icons/Icon";
+import Quiz from "~/lib/icons/Quiz";
 import { Roadmap } from "~/queries/roadmap-queries";
 import Animated, {
   useSharedValue,
@@ -16,6 +17,7 @@ interface RoadmapCardProps {
   roadmap: Roadmap;
   onPress: () => void;
   onDelete?: (roadmapId: string) => void;
+  onQuizPress?: (roadmapId: string) => void;
   delay?: number;
 }
 
@@ -23,6 +25,7 @@ export default function RoadmapCard({
   roadmap,
   onPress,
   onDelete,
+  onQuizPress,
   delay = 0,
 }: RoadmapCardProps) {
   const scale = useSharedValue(0.8);
@@ -130,6 +133,13 @@ export default function RoadmapCard({
     }
   };
 
+  const handleQuizPress = (e: any) => {
+    e.stopPropagation(); // Prevent triggering the card press
+    if (onQuizPress) {
+      onQuizPress(roadmap.id);
+    }
+  };
+
   return (
     <Animated.View style={cardStyle}>
       <Pressable
@@ -173,6 +183,16 @@ export default function RoadmapCard({
 
               <View className="items-end">
                 <View className="flex-row items-center mb-1">
+                  <TouchableOpacity
+                    onPress={handleQuizPress}
+                    className="p-2 mr-1 rounded-full bg-blue-500/10"
+                    disabled={isDeleting}
+                  >
+                    <Quiz 
+                      size={14} 
+                      color="#3b82f6" 
+                    />
+                  </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleDeletePress}
                     disabled={isDeleting}
