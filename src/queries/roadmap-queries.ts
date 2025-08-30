@@ -123,7 +123,7 @@ export async function generateRoadmapFromBackend(
   }
 }
 
-export async function saveRoadmap(roadmap: Roadmap): Promise<void> {
+export async function saveRoadmap(roadmap: Roadmap): Promise<Roadmap> {
   try {
     const currentUser = await authService.getCurrentUser();
     if (!currentUser) {
@@ -154,6 +154,26 @@ export async function saveRoadmap(roadmap: Roadmap): Promise<void> {
     }
 
     console.log("Roadmap saved successfully for user:", currentUser.id);
+    
+    // Return the saved roadmap with the correct database ID
+    const savedRoadmap = {
+      id: result.data.id, // This is the database ID
+      topic: result.data.topic,
+      title: roadmap.title,
+      description: roadmap.description,
+      createdAt: result.data.createdAt,
+      updatedAt: result.data.updatedAt,
+      points: roadmap.points,
+      progress: roadmap.progress,
+    };
+    
+    console.log("🔄 ID transformation:", {
+      originalId: roadmap.id,
+      databaseId: result.data.id,
+      savedRoadmapId: savedRoadmap.id
+    });
+    
+    return savedRoadmap;
   } catch (error) {
     console.error("Error saving roadmap:", error);
     throw error;
@@ -766,16 +786,17 @@ export async function generateNewRoadmap(topic: string): Promise<Roadmap> {
     const roadmap = await generateRoadmapFromBackend(topic);
     console.log("✅ Roadmap generated:", roadmap);
     
-    // Save the generated roadmap to user's collection
+    // Save the generated roadmap to user's collection and get the saved roadmap with database ID
     console.log("💾 Saving roadmap to backend...");
-    await saveRoadmap(roadmap);
+    const savedRoadmap = await saveRoadmap(roadmap);
+    console.log("✅ Roadmap saved with database ID:", savedRoadmap.id);
     
     // Set as active roadmap for navigation
     console.log("🎯 Setting as active roadmap...");
-    await setActiveRoadmap(roadmap);
+    await setActiveRoadmap(savedRoadmap);
     
     console.log("🎉 Roadmap generation complete!");
-    return roadmap;
+    return savedRoadmap; // Return the saved roadmap with correct database ID
   } catch (error) {
     console.error("❌ Error generating new roadmap:", error);
     throw error;

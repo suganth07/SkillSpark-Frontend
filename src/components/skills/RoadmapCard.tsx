@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, Pressable, Alert } from "react-native";
+import { View, Text, TouchableOpacity, Pressable, Alert, Image } from "react-native";
 import { Card } from "~/components/ui/card";
 import Icon from "~/lib/icons/Icon";
-import Quiz from "~/lib/icons/Quiz";
 import { Roadmap } from "~/queries/roadmap-queries";
 import Animated, {
   useSharedValue,
@@ -10,7 +9,6 @@ import Animated, {
   withTiming,
   withSpring,
   withDelay,
-  Easing,
 } from "react-native-reanimated";
 
 interface RoadmapCardProps {
@@ -19,6 +17,7 @@ interface RoadmapCardProps {
   onDelete?: (roadmapId: string) => void;
   onQuizPress?: (roadmapId: string) => void;
   delay?: number;
+  quizStatus?: 'available' | 'generating' | 'not-available';
 }
 
 export default function RoadmapCard({
@@ -27,6 +26,7 @@ export default function RoadmapCard({
   onDelete,
   onQuizPress,
   delay = 0,
+  quizStatus = 'not-available',
 }: RoadmapCardProps) {
   const scale = useSharedValue(0.8);
   const opacity = useSharedValue(0);
@@ -125,6 +125,35 @@ export default function RoadmapCard({
   const progressPercentage =
     totalPoints > 0 ? Math.round((completedPoints / totalPoints) * 100) : 0;
 
+  // Get quiz button colors based on status
+  const getQuizButtonColors = () => {
+    switch (quizStatus) {
+      case 'available':
+        return {
+          background: 'bg-blue-500/10',
+          border: 'border-blue-300',
+          textColor: 'text-blue-600',
+          iconColor: '#2563eb'
+        };
+      case 'generating':
+        return {
+          background: 'bg-red-500/10',
+          border: 'border-red-300',
+          textColor: 'text-red-600',
+          iconColor: '#dc2626'
+        };
+      default: // not-available
+        return {
+          background: 'bg-gray-500/10',
+          border: 'border-gray-300',
+          textColor: 'text-gray-600',
+          iconColor: '#6b7280'
+        };
+    }
+  };
+
+  const buttonColors = getQuizButtonColors();
+
   const handleDeletePress = (e: any) => {
     e.stopPropagation(); // Prevent triggering the card press
     if (onDelete) {
@@ -183,16 +212,32 @@ export default function RoadmapCard({
 
               <View className="items-end">
                 <View className="flex-row items-center mb-1">
-                  <TouchableOpacity
-                    onPress={handleQuizPress}
-                    className="p-2 mr-1 rounded-full bg-blue-500/10"
-                    disabled={isDeleting}
-                  >
-                    <Quiz 
-                      size={14} 
-                      color="#3b82f6" 
-                    />
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleQuizPress}
+                      className={`flex-row items-center px-3 py-2 mr-2 rounded-md ${buttonColors.background} border ${buttonColors.border}`}
+                      disabled={isDeleting || quizStatus === 'generating'}
+                      style={{
+                      minWidth: 80,
+                      minHeight: 38,
+                      justifyContent: "center",
+                      opacity: quizStatus === 'generating' ? 0.8 : 1,
+                      }}
+                    >
+                      <View className="flex-row items-center">
+                        <Image
+                          source={{ uri: "https://img.icons8.com/pulsar-line/100/quiz.png" }}
+                          style={{ 
+                            width: 20, 
+                            height: 20, 
+                            marginRight: 6,
+                            tintColor: buttonColors.iconColor 
+                          }}
+                        />
+                        <Text className={`text-sm font-semibold ${buttonColors.textColor}`}>
+                          {quizStatus === 'generating' ? 'Creating...' : 'Quiz'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleDeletePress}
                     disabled={isDeleting}

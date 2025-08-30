@@ -6,6 +6,8 @@ import Icon from "~/lib/icons/Icon";
 import { useColorScheme } from "~/lib/utils/useColorScheme";
 import { useRoadmapData } from "~/lib/utils/RoadmapDataContext";
 import { generateNewRoadmap } from "~/queries/roadmap-queries";
+import { QuizAPI } from "~/lib/api";
+import authService from "~/services/authService";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -66,7 +68,25 @@ export default function RoadmapGenerator({
     startLoadingAnimation();
 
     try {
-      const roadmap = await generateNewRoadmap(topic.trim());
+      const savedRoadmap = await generateNewRoadmap(topic.trim());
+
+      // Generate quiz in background after roadmap creation using the correct database ID
+      try {
+        const user = await authService.getCurrentUser();
+        if (user && savedRoadmap?.id) {
+          console.log('🎯 Starting background quiz generation for roadmap:', savedRoadmap.id);
+          QuizAPI.generateQuizInBackground(savedRoadmap.id, user.id)
+            .then((result) => {
+              if (result.success) {
+                console.log('✅ Background quiz generation completed');
+              } else {
+                console.warn('⚠️ Background quiz generation failed:', result.error);
+              }
+            });
+        }
+      } catch (quizError) {
+        console.warn('⚠️ Quiz generation failed, but roadmap created successfully:', quizError);
+      }
 
       refreshData();
 

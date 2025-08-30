@@ -103,17 +103,48 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
           }));
         }
         
-      } catch (getError) {
-        console.log('📭 No existing quiz found, generating new one...');
-        
-        // Generate new quiz
-        const newQuiz = await QuizAPI.generateQuiz(userRoadmapId, user.id);
-        console.log('✅ Generated new quiz');
-        
-        setState(prev => ({
-          ...prev,
-          quiz: newQuiz.data
-        }));
+      } catch (getError: any) {
+        // Only generate new quiz if we get a 404 (quiz doesn't exist)
+        if (getError.message?.includes('404')) {
+          console.log('📭 No existing quiz found, will wait for generation or generate if not already started...');
+          
+          // First, wait a bit and try again in case generation is already in progress
+          let retryCount = 0;
+          const maxRetries = 3;
+          let quizFound = false;
+          
+          while (retryCount < maxRetries && !quizFound) {
+            console.log(`🔄 Retry ${retryCount + 1}/${maxRetries}: Checking for quiz...`);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+            
+            try {
+              const retryQuiz = await QuizAPI.getQuiz(userRoadmapId, user.id);
+              console.log('✅ Found quiz on retry!');
+              setState(prev => ({
+                ...prev,
+                quiz: retryQuiz.data
+              }));
+              quizFound = true;
+            } catch (retryError) {
+              retryCount++;
+            }
+          }
+          
+          // If still no quiz found after retries, generate new one
+          if (!quizFound) {
+            console.log('🧠 Generating new quiz as fallback...');
+            const newQuiz = await QuizAPI.generateQuiz(userRoadmapId, user.id);
+            console.log('✅ Generated new quiz');
+            
+            setState(prev => ({
+              ...prev,
+              quiz: newQuiz.data
+            }));
+          }
+        } else {
+          // For other errors, throw them
+          throw getError;
+        }
       }
       
     } catch (error: any) {
@@ -468,16 +499,19 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
     console.log('🔍 Debug - state.results structure:', state.results);
     
     // Handle different possible API response structures
-    let results, userAnswers;
+    let results: any, userAnswers: any;
     
-    if (state.results.results) {
-      // Standard structure: state.results.results and state.results.userAnswers
-      results = state.results.results;
-      userAnswers = state.results.userAnswers;
-    } else if (state.results.data && state.results.data.results) {
-      // Nested structure: state.results.data.results and state.results.data.userAnswers  
-      results = state.results.data.results;
-      userAnswers = state.results.data.userAnswers;
+    // Type assertion to handle the nested API response structure
+    const resultsData = state.results as any;
+    
+    if (resultsData.data && resultsData.data.results) {
+      // Nested structure: state.results.data.results and state.results.data.userAnswers
+      results = resultsData.data.results;
+      userAnswers = resultsData.data.userAnswers;
+    } else if (resultsData.results) {
+      // Direct structure: state.results.results and state.results.userAnswers
+      results = resultsData.results;
+      userAnswers = resultsData.userAnswers;
     } else {
       console.error('Results data not found in state.results:', state.results);
       console.error('Available keys in state.results:', Object.keys(state.results));
@@ -550,7 +584,7 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
         </View>
 
         {/* Question Review */}
-        {userAnswers && userAnswers.map((userAnswer, index) => {
+        {userAnswers && userAnswers.map((userAnswer: any, index: number) => {
           const question = state.quiz!.quiz_data.questions[index];
           const isCorrect = userAnswer.isCorrect;
           

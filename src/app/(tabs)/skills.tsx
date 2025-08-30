@@ -9,6 +9,8 @@ import SearchBar from "~/components/skills/SearchBar";
 import { Button } from "~/components/ui/button";
 import Icon from "~/lib/icons/Icon";
 import { useColorScheme } from "~/lib/utils/useColorScheme";
+import { QuizAPI } from "~/lib/api";
+import authService from "~/services/authService";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -28,6 +30,7 @@ export default function SkillsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [roadmapToDelete, setRoadmapToDelete] = useState<Roadmap | null>(null);
+  const [quizStatuses, setQuizStatuses] = useState<Record<string, 'available' | 'generating' | 'not-available'>>({});
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -84,6 +87,8 @@ export default function SkillsScreen() {
   useFocusEffect(
     useCallback(() => {
       loadRoadmaps();
+      // Clear any lingering quiz statuses when screen comes into focus
+      setQuizStatuses({});
     }, [])
   );
 
@@ -97,11 +102,54 @@ export default function SkillsScreen() {
       );
       setRoadmaps(sortedRoadmaps);
       setFilteredRoadmaps(sortedRoadmaps);
+      
+      // Check quiz status for each roadmap after 5 seconds delay
+      setTimeout(() => {
+        checkQuizStatusForRoadmaps(sortedRoadmaps);
+      }, 5000);
     } catch (error) {
       console.error("Error loading roadmaps:", error);
       Alert.alert("Error", "Failed to load your roadmaps");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkQuizStatusForRoadmaps = async (roadmaps: Roadmap[]) => {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user) return;
+
+      for (const roadmap of roadmaps) {
+        try {
+          // Check if quiz already exists
+          await QuizAPI.getQuiz(roadmap.id, user.id);
+          console.log(`✅ Quiz exists for roadmap: ${roadmap.id}`);
+          setQuizStatuses(prev => ({ ...prev, [roadmap.id]: 'available' }));
+        } catch (error: any) {
+          if (error.message?.includes('404') || error.message?.includes('not found')) {
+            console.log(`📭 No quiz found for roadmap: ${roadmap.id}, starting generation...`);
+            // Set status to generating and start quiz creation
+            setQuizStatuses(prev => ({ ...prev, [roadmap.id]: 'generating' }));
+            
+            // Start quiz generation
+            QuizAPI.generateQuiz(roadmap.id, user.id)
+              .then(() => {
+                console.log(`✅ Quiz generated successfully for roadmap: ${roadmap.id}`);
+                setQuizStatuses(prev => ({ ...prev, [roadmap.id]: 'available' }));
+              })
+              .catch((genError: any) => {
+                console.error(`❌ Quiz generation failed for roadmap: ${roadmap.id}`, genError);
+                setQuizStatuses(prev => ({ ...prev, [roadmap.id]: 'not-available' }));
+              });
+          } else {
+            console.error(`❌ Error checking quiz for roadmap: ${roadmap.id}`, error);
+            setQuizStatuses(prev => ({ ...prev, [roadmap.id]: 'not-available' }));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error checking quiz statuses:', error);
     }
   };
 
@@ -173,17 +221,60 @@ export default function SkillsScreen() {
     });
   };
 
-  const handleQuizPress = (roadmapId: string) => {
+  const handleQuizPress = async (roadmapId: string) => {
     const roadmap = roadmaps.find(r => r.id === roadmapId);
     if (!roadmap) return;
 
-    router.push({
-      pathname: "/quiz",
-      params: { 
-        userRoadmapId: roadmap.id,
-        topic: roadmap.topic
-      },
-    });
+    const currentStatus = quizStatuses[roadmapId];
+    
+    // If quiz is currently generating, don't do anything
+    if (currentStatus === 'generating') {
+      return;
+    }
+
+    // If quiz is available, navigate to quiz screen
+    if (currentStatus === 'available') {
+      router.push({
+        pathname: "/quiz",
+        params: { 
+          userRoadmapId: roadmap.id,
+          topic: roadmap.topic
+        },
+      });
+      return;
+    }
+
+    // If quiz is not available, start generation
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user) {
+        Alert.alert("Error", "Please log in to take quizzes");
+        return;
+      }
+
+      // Set status to generating
+      setQuizStatuses(prev => ({ ...prev, [roadmapId]: 'generating' }));
+
+      // Generate the quiz
+      await QuizAPI.generateQuiz(roadmapId, user.id);
+      
+      // Set status to available
+      setQuizStatuses(prev => ({ ...prev, [roadmapId]: 'available' }));
+      
+      // Navigate to quiz screen
+      router.push({
+        pathname: "/quiz",
+        params: { 
+          userRoadmapId: roadmap.id,
+          topic: roadmap.topic
+        },
+      });
+      
+    } catch (error: any) {
+      console.error('❌ Error generating quiz:', error);
+      Alert.alert("Error", "Failed to generate quiz. Please try again.");
+      setQuizStatuses(prev => ({ ...prev, [roadmapId]: 'not-available' }));
+    }
   };
 
   const handleDeleteRoadmap = async (roadmapId: string) => {
@@ -235,6 +326,7 @@ export default function SkillsScreen() {
       onDelete={handleDeleteRoadmap}
       onQuizPress={handleQuizPress}
       delay={index * 100}
+      quizStatus={quizStatuses[item.id] || 'not-available'}
     />
   );
 

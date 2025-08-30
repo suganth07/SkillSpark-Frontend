@@ -370,6 +370,41 @@ export const QuizAPI = {
     }
   },
 
+  // Generate quiz in background after roadmap creation
+  async generateQuizInBackground(userRoadmapId: string, userId: string) {
+    try {
+      console.log('🔄 Generating quiz in background for roadmap:', userRoadmapId);
+      
+      const requestBody = { userId };
+      const requestHeaders = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+      
+      const url = `${BACKEND_URL}/api/quizzes/generate/${userRoadmapId}`;
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: requestHeaders,
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Background quiz generation failed:', errorText);
+        // Don't throw error to not break the main flow
+        return { success: false, error: errorText };
+      }
+
+      const result = await response.json();
+      console.log('✅ Background quiz generated successfully for roadmap:', userRoadmapId);
+      return { success: true, data: result };
+    } catch (error: any) {
+      console.error('❌ Error generating quiz in background:', error);
+      return { success: false, error: error?.message || 'Unknown error' };
+    }
+  },
+
   // Get existing quiz
   async getQuiz(userRoadmapId: string, userId: string) {
     try {
